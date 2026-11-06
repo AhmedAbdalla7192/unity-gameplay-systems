@@ -1,0 +1,14 @@
+{
+    "name": "Dragonveil.StateMachine",
+    "rootNamespace": "Dragonveil.StateMachine",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

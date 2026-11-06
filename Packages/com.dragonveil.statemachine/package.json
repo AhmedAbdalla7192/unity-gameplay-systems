@@ -1,0 +1,18 @@
+{
+  "name": "com.dragonveil.statemachine",
+  "version": "1.0.0",
+  "displayName": "Dragonveil State Machine",
+  "description": "A small hierarchical state machine for Unity: states, super states with their own sub-states, prioritised transitions with optional transition steps, and a tick-authority hook for networked games.",
+  "unity": "6000.0",
+  "author": {
+    "name": "Ahmed Abdalla",
+    "url": "https://github.com/AhmedAbdalla7192"
+  },
+  "keywords": [
+    "state machine",
+    "hierarchical state machine",
+    "fsm",
+    "character controller",
+    "gameplay"
+  ]
+}
