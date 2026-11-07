@@ -141,14 +141,6 @@ Runtime/
 Tests/Runtime/               # 18 PlayMode tests (Unity Test Framework)
 ```
 
-## Install
-
-In Unity 6, open **Window → Package Manager → + → Install package from git URL** and enter:
-
-```
-https://github.com/AhmedAbdalla7192/unity-gameplay-systems.git?path=Packages/com.dragonveil.statemachine
-```
-
 ## Run the tests
 
 Open the repository root in Unity 6000.3, then **Window → General → Test Runner → PlayMode → Run All**. Or from the command line:
@@ -156,3 +148,7 @@ Open the repository root in Unity 6000.3, then **Window → General → Test Run
 ```bash
 Unity -batchmode -projectPath . -runTests -testPlatform PlayMode -testResults results.xml
 ```
+
+## Rights
+
+Copyright (c) 2024-2026 Ahmed Abdalla. All rights reserved. The code is public so it can be read and evaluated. It may not be copied or used in other projects without permission. See [LICENSE](../../LICENSE).

@@ -1,3 +1,5 @@
+// Copyright (c) 2024-2026 Ahmed Abdalla. All rights reserved. See LICENSE in the repository root.
+
 using System;
 using System.Collections;
 
