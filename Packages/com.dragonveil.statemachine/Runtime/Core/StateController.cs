@@ -60,6 +60,8 @@ namespace Dragonveil.StateMachine
 
         protected virtual void OnDisable()
         {
+            // Unity stops this object's coroutines on disable, so cancel a waiting transition rather than leave it hanging.
+            transitionHandler?.CancelTransition();
             ExitCurrentState();
             hadTickAuthority = false;
         }
@@ -67,7 +69,7 @@ namespace Dragonveil.StateMachine
         public void CreateTransition(State fromState, State toState, Condition condition, int priority = 0)
             => transitionHandler.CreateTransition(fromState, toState, condition, priority);
 
-        public void CreateTransition(State fromState, State toState, Condition condition, System.Collections.IEnumerator transitionRoutine, float transitionTimeInSeconds = 0f, int priority = 0)
+        public void CreateTransition(State fromState, State toState, Condition condition, Func<System.Collections.IEnumerator> transitionRoutine, float transitionTimeInSeconds = 0f, int priority = 0)
             => transitionHandler.CreateTransition(fromState, toState, condition, transitionRoutine, transitionTimeInSeconds, priority);
 
         public void CreateTransition(State fromState, State toState, Condition condition, Action transitionMethod, float transitionTimeInSeconds = 0f, int priority = 0)
@@ -101,7 +103,7 @@ namespace Dragonveil.StateMachine
             if (initialized)
                 return;
 
-            transitionHandler = new TransitionHandler(this);
+            transitionHandler = new TransitionHandler(this, isRoot: true);
             InitialiseStates();
             transitionHandler.SetInitialState(AwakeState());
             CreateTransitions();

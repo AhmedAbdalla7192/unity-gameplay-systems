@@ -94,5 +94,61 @@ namespace Dragonveil.StateMachine.Tests
             yield return null;
             Assert.IsFalse(controller.CurrentState.IsInCategory<IGroundedState>());
         }
+
+        // Regression: a sub-state transition ready on entry used to exit Idle without ever entering it.
+        [UnityTest]
+        public IEnumerator EnteringWithASubTransitionReady_EntersTheInitialSubStateFirst()
+        {
+            moving = true;
+
+            gameObject.SetActive(true);
+            yield return null;
+
+            Assert.AreEqual(new[] { "Ground.Enter", "Idle.Enter", "Idle.Exit", "Run.Enter", "Run.Do" }, log.WithoutPhysicsSteps());
+        }
+
+        // Regression: sub-state changes used to fire the controller's root StateChanged event.
+        [UnityTest]
+        public IEnumerator SubStateChanges_AreReportedByTheSuperStateNotTheController()
+        {
+            var rootChanges = new List<string>();
+            var subChanges = new List<string>();
+            controller.StateChanged += (from, to) => rootChanges.Add($"{from}->{to}");
+            ground.TransitionHandler.StateChanged += (from, to) => subChanges.Add($"{from}->{to}");
+
+            gameObject.SetActive(true);
+            yield return null;
+            moving = true;
+            yield return null;
+            airborne = true;
+            yield return null;
+
+            Assert.AreEqual(new[] { "Idle->Run" }, subChanges.ToArray());
+            Assert.AreEqual(new[] { "Ground->Air" }, rootChanges.ToArray());
+        }
+
+        // Regression: disabling during a delayed sub-state transition used to leave the super state stuck.
+        [UnityTest]
+        public IEnumerator DisablingDuringASubStateTransition_DoesNotLeaveItStuck()
+        {
+            var crouch = new RecordingState("Crouch", log);
+            bool crouchPressed = true;
+            ground.TransitionHandler.CreateTransition(idle, crouch, () => crouchPressed, () => { }, transitionTimeInSeconds: 0.2f, priority: 1);
+
+            gameObject.SetActive(true);
+            yield return null;
+            Assert.IsTrue(ground.TransitionHandler.IsTransitioning);
+
+            gameObject.SetActive(false);
+            crouchPressed = false;
+            gameObject.SetActive(true);
+            yield return new WaitForSeconds(0.4f);
+
+            Assert.IsFalse(ground.TransitionHandler.IsTransitioning);
+            Assert.AreSame(idle, controller.CurrentState.GetActiveLeaf());
+            CollectionAssert.DoesNotContain(log, "Crouch.Enter");
+            Assert.AreEqual(1, log.FindAll(entry => entry == "Idle.Exit").Count, "Idle is not exited twice.");
+            CollectionAssert.Contains(log, "Idle.Do", "Idle ticks again after re-enabling.");
+        }
     }
 }

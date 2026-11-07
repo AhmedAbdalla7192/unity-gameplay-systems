@@ -73,11 +73,47 @@ public class IdleState : State
 }
 ```
 
-A transition with a step, for example a 0.15 s dash wind-up:
+A transition with a step, for example a 0.15 s dash wind-up, or a coroutine that runs every time the transition fires:
 
 ```csharp
 CreateTransition(run, dash, () => dashPressed, transitionMethod: PlayDashWindUp, transitionTimeInSeconds: 0.15f);
+CreateTransition(ground, ledgeHang, () => grabbedLedge, () => SnapToLedge());   // SnapToLedge() returns IEnumerator
 ```
+
+A super state with its own sub-states:
+
+```csharp
+public class GroundState : SuperState
+{
+    private readonly State idle, run;
+
+    public GroundState(PlayerController player) : base(player)
+    {
+        idle = new IdleState(player);
+        run = new RunState(player);
+        TransitionHandler.CreateTwoWayTransition(idle, run, () => player.IsMoving, () => !player.IsMoving);
+        TransitionHandler.StateChanged += (from, to) => Debug.Log($"Ground: {from} → {to}");
+    }
+
+    protected override State AwakeSubState() => idle;
+    protected override void SuperStateEnter() { /* snap to ground */ }
+    protected override void SuperStateDo() { }
+    protected override void SuperStateFixedDo() { /* apply gravity */ }
+    protected override void SuperStateExit() { }
+}
+```
+
+## Behaviour you can rely on
+
+These rules are each covered by a PlayMode test.
+
+- **Exit before enter.** The old state's `Exit()` runs before the next state's `Enter()`. Leaving a super state exits its sub-state first.
+- **Deterministic picks.** The highest priority wins; equal priorities keep the order transitions were added in.
+- **No ticking mid-transition.** While a transition's steps are running, `Do()` and `FixedDo()` are skipped.
+- **Steps run every time.** A coroutine step is created fresh each time its transition fires.
+- **Disabling cancels cleanly.** Disabling the controller mid-transition cancels the transition. The destination is never entered, and the state being left is entered again when the controller is re-enabled.
+- **Sub-states enter before they leave.** Entering a super state always enters its sub-state before checking the sub-state's transitions.
+- **Events stay at their level.** `StateController.StateChanged` reports top-level changes only. Each super state's `TransitionHandler.StateChanged` reports its own sub-state changes.
 
 Gating the machine for networking, without depending on a networking package:
 
@@ -102,7 +138,7 @@ Runtime/
 └── Transitions/
     ├── Transition.cs        # from → to, condition, priority, optional steps
     └── TransitionHandler.cs # picks and runs transitions
-Tests/Runtime/               # PlayMode tests (Unity Test Framework)
+Tests/Runtime/               # 18 PlayMode tests (Unity Test Framework)
 ```
 
 ## Install

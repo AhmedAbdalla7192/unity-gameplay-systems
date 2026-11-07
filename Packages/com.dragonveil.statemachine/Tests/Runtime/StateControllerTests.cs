@@ -157,6 +157,68 @@ namespace Dragonveil.StateMachine.Tests
             CollectionAssert.Contains(log, "Idle.FixedDo");
         }
 
+        private static IEnumerator TwoFrameRoutine(List<string> log)
+        {
+            log.Add("Routine.Start");
+            yield return null;
+            log.Add("Routine.End");
+        }
+
+        // Regression: the routine used to be one stored IEnumerator, so it only ran the first time.
+        [UnityTest]
+        public IEnumerator CoroutineStep_RunsEveryTimeTheTransitionFires()
+        {
+            var idle = new RecordingState("Idle", log);
+            var dash = new RecordingState("Dash", log);
+            bool dashing = false;
+            controller.InitialState = idle;
+            controller.BuildTransitions = c =>
+            {
+                c.CreateTransition(idle, dash, () => dashing, () => TwoFrameRoutine(log));
+                c.CreateTransition(dash, idle, () => !dashing);
+            };
+
+            gameObject.SetActive(true);
+            yield return null;
+
+            for (int i = 0; i < 2; i++)
+            {
+                dashing = true;
+                for (int frame = 0; frame < 4; frame++) yield return null;
+                dashing = false;
+                for (int frame = 0; frame < 2; frame++) yield return null;
+            }
+
+            Assert.AreEqual(2, log.FindAll(entry => entry == "Routine.End").Count);
+            Assert.AreEqual(2, log.FindAll(entry => entry == "Dash.Enter").Count);
+        }
+
+        // Regression: disabling mid-transition used to leave the machine "transitioning" forever.
+        [UnityTest]
+        public IEnumerator DisablingDuringADelayedTransition_CancelsItAndReentersTheOldState()
+        {
+            var idle = new RecordingState("Idle", log);
+            var dash = new RecordingState("Dash", log);
+            bool dashPressed = true;
+            controller.InitialState = idle;
+            controller.BuildTransitions = c => c.CreateTransition(idle, dash, () => dashPressed, () => { }, transitionTimeInSeconds: 0.2f);
+
+            gameObject.SetActive(true);
+            yield return null;
+            Assert.IsTrue(controller.IsTransitioning);
+
+            gameObject.SetActive(false);
+            dashPressed = false;
+            gameObject.SetActive(true);
+            yield return new WaitForSeconds(0.4f);
+
+            Assert.IsFalse(controller.IsTransitioning);
+            Assert.AreSame(idle, controller.CurrentState);
+            Assert.AreEqual(2, log.FindAll(entry => entry == "Idle.Enter").Count, "Idle is entered again after re-enabling.");
+            CollectionAssert.DoesNotContain(log, "Dash.Enter", "A cancelled transition never enters its destination.");
+            Assert.AreEqual(1, log.FindAll(entry => entry == "Idle.Exit").Count, "Idle is not exited twice.");
+        }
+
         [UnityTest]
         public IEnumerator Disabling_ExitsTheCurrentState()
         {

@@ -5,29 +5,42 @@ using UnityEngine;
 
 namespace Dragonveil.StateMachine.Transitions
 {
+    /// <summary>
+    /// Holds one level's transitions and its current state, and runs a transition when its condition is met.
+    /// A <see cref="StateController"/> owns the root handler; each <see cref="SuperState"/> owns one for its sub-states.
+    /// </summary>
     public sealed class TransitionHandler
     {
         private readonly List<Transition> transitions = new();
         private readonly StateController stateController;
+        private readonly bool isRoot;
+        private Coroutine runningTransition;
 
         public State CurrentState { get; private set; }
         public bool IsTransitioning { get; private set; }
         public IReadOnlyList<Transition> Transitions => transitions;
 
-        public TransitionHandler(StateController attachedController)
+        /// <summary>
+        /// Raised after this handler finishes a transition, with the previous and new state.
+        /// For a super state's handler this reports sub-state changes; the controller's own event reports root changes only.
+        /// </summary>
+        public event Action<State, State> StateChanged;
+
+        internal TransitionHandler(StateController attachedController, bool isRoot)
         {
             stateController = attachedController ?? throw new ArgumentNullException(nameof(attachedController));
+            this.isRoot = isRoot;
         }
 
         internal void SetInitialState(State state)
         {
-            CurrentState = state ?? throw new InvalidOperationException("AwakeState returned null.");
+            CurrentState = state ?? throw new InvalidOperationException("The initial state cannot be null.");
         }
 
         public void CreateTransition(State fromState, State toState, Condition condition, int priority = 0)
             => AddTransition(new Transition(fromState, toState, condition, priority));
 
-        public void CreateTransition(State fromState, State toState, Condition condition, IEnumerator transitionRoutine, float transitionTimeInSeconds = 0f, int priority = 0)
+        public void CreateTransition(State fromState, State toState, Condition condition, Func<IEnumerator> transitionRoutine, float transitionTimeInSeconds = 0f, int priority = 0)
             => AddTransition(new Transition(fromState, toState, condition, transitionRoutine, transitionTimeInSeconds, priority));
 
         public void CreateTransition(State fromState, State toState, Condition condition, Action transitionMethod, float transitionTimeInSeconds = 0f, int priority = 0)
@@ -68,18 +81,41 @@ namespace Dragonveil.StateMachine.Transitions
 
             State previous = CurrentState;
             previous?.Exit();
-            stateController.NotifyTransitionStarted();
+            if (isRoot)
+                stateController.NotifyTransitionStarted();
             IsTransitioning = true;
 
-            bool hasPipeline = transition.TransitionRoutine != null ||
-                               transition.TransitionMethod != null ||
-                               transition.TransitionTimeInSeconds > 0f;
-            if (hasPipeline)
-                stateController.StartCoroutine(RunTransition(previous, transition));
+            bool hasSteps = transition.TransitionRoutine != null ||
+                            transition.TransitionMethod != null ||
+                            transition.TransitionTimeInSeconds > 0f;
+            if (hasSteps)
+            {
+                Coroutine started = stateController.StartCoroutine(RunTransition(previous, transition));
+                // Steps with nothing to wait on finish inside StartCoroutine, so only keep a handle that is still running.
+                if (IsTransitioning)
+                    runningTransition = started;
+            }
             else
+            {
                 CompleteTransition(previous, transition.ToState);
+            }
 
             return true;
+        }
+
+        /// <summary>
+        /// Stops a transition that is waiting on its steps. The state being left stays current and has already exited,
+        /// so it is entered again the next time this level is entered. Its destination is never entered.
+        /// </summary>
+        internal void CancelTransition()
+        {
+            if (!IsTransitioning)
+                return;
+
+            if (runningTransition != null)
+                stateController.StopCoroutine(runningTransition);
+            runningTransition = null;
+            IsTransitioning = false;
         }
 
         internal Transition SelectBestTransitionFrom(State fromState)
@@ -104,11 +140,10 @@ namespace Dragonveil.StateMachine.Transitions
 
         private IEnumerator RunTransition(State previous, Transition transition)
         {
-            if (transition.TransitionMethod != null)
-                transition.TransitionMethod.Invoke();
+            transition.TransitionMethod?.Invoke();
 
             if (transition.TransitionRoutine != null)
-                yield return transition.TransitionRoutine;
+                yield return transition.TransitionRoutine();
 
             if (transition.TransitionTimeInSeconds > 0f)
                 yield return new WaitForSeconds(transition.TransitionTimeInSeconds);
@@ -118,12 +153,16 @@ namespace Dragonveil.StateMachine.Transitions
 
         private void CompleteTransition(State previous, State next)
         {
+            runningTransition = null;
             CurrentState = next ?? throw new InvalidOperationException("A transition target cannot be null.");
             bool entered = stateController.CanCurrentlyTick;
             if (entered)
                 CurrentState.Enter();
             IsTransitioning = false;
-            stateController.NotifyStateChanged(previous, CurrentState, entered);
+
+            if (isRoot)
+                stateController.NotifyStateChanged(previous, CurrentState, entered);
+            StateChanged?.Invoke(previous, CurrentState);
         }
     }
 }

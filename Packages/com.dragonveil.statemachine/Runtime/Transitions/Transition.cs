@@ -15,7 +15,7 @@ namespace Dragonveil.StateMachine.Transitions
         private State _fromState;
         private State _toState;
         private int _priority;
-        private readonly IEnumerator transitionRoutine;
+        private readonly Func<IEnumerator> transitionRoutine;
         private readonly Action transitionMethod;
         private readonly float transitionTimeInSeconds;
         #endregion
@@ -57,7 +57,10 @@ namespace Dragonveil.StateMachine.Transitions
             get => _priority;
             set => _priority = value;
         }
-        public IEnumerator TransitionRoutine => transitionRoutine;
+        /// <summary>
+        /// Creates the coroutine to run during the transition. A fresh coroutine is created every time the transition fires.
+        /// </summary>
+        public Func<IEnumerator> TransitionRoutine => transitionRoutine;
         public Action TransitionMethod => transitionMethod;
         public float TransitionTimeInSeconds => transitionTimeInSeconds;
         #endregion
@@ -79,16 +82,17 @@ namespace Dragonveil.StateMachine.Transitions
 
         /// <summary>
         /// Create a transition between <paramref name="fromState"/> to <paramref name="toState"/> with a trigger <paramref name="condition"/>.
-        /// Add a coroutine that occurs between transitions.
+        /// Add a coroutine that runs between the two states. <paramref name="transitionRoutine"/> is called each time the
+        /// transition fires, so the coroutine runs every time, not just the first.
         /// </summary>
-        public Transition(State fromState, State toState, Condition condition, IEnumerator ienumTransitionMethod, float transitionTimeInSeconds, int priority = 0)
+        public Transition(State fromState, State toState, Condition condition, Func<IEnumerator> transitionRoutine, float transitionTimeInSeconds, int priority = 0)
         {
             FromState = fromState;
             ToState = toState;
             Condition = condition;
             Priority = priority;
             transitionMethod = null;
-            transitionRoutine = ienumTransitionMethod;
+            this.transitionRoutine = transitionRoutine;
             this.transitionTimeInSeconds = transitionTimeInSeconds;
         }
 
