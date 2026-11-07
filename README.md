@@ -1,6 +1,6 @@
 # Unity gameplay systems
 
-Reusable gameplay systems from my own games, packaged so they can be read, tested and installed on their own. All code by Ahmed Abdalla ([LinkedIn](https://www.linkedin.com/in/ahmedabdallacs/) · [itch.io](https://dragonveil.itch.io)).
+Reusable gameplay systems from my own games, packaged so each one can be read and tested on its own. All code by Ahmed Abdalla ([LinkedIn](https://www.linkedin.com/in/ahmedabdallacs/) · [itch.io](https://dragonveil.itch.io)).
 
 | Package | What it is |
 |---|---|
